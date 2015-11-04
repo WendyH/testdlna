@@ -26,17 +26,23 @@ namespace testdlna {
 
 			dlnaDevice.UserAgent = userAgent;
 
+			Console.WriteLine("Поиск устройств воспроизведения...");
+
+			dlnaDevice.SearchRenderers();
+
 			Console.WriteLine("Установка адреса файла...");
 
 			dlnaDevice.SetFile(fileURI, "Advertisement", "00:00:30.000", "2015-11-04T11:54:23");
 
 			Console.WriteLine("Ответ от устройства: \n" + dlnaDevice.responseText);
+			Console.WriteLine(dlnaDevice.responseBody);
 
 			Console.WriteLine("Play...");
 
 			dlnaDevice.Play();
 
 			Console.WriteLine("Ответ от устройства: \n" + dlnaDevice.responseText);
+			Console.WriteLine(dlnaDevice.responseBody);
 		}
 	}
 }

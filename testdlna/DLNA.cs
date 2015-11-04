@@ -2,7 +2,9 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace testdlna {
 	internal sealed class DLNA {
@@ -21,10 +23,11 @@ namespace testdlna {
 			deviceAddr = "http://" + deviceIP + ":" + devicePort;
 		}
 
-		private void SetSOAPAction(string service, string cmd) {
+		private void SetSOAPAction(string service, string cmd, int InstanceID) {
 			soapService = service;
 			soapCommand = cmd;
-			Request = (HttpWebRequest)WebRequest.Create(deviceAddr + "/upnp/control/" + service);
+			string url  = deviceAddr + "/upnp/control/" + service;
+            Request = (HttpWebRequest)WebRequest.Create(url);
 			Request.KeepAlive = false;
 			//Request.Connection  = "Close";
 			Request.Method      = "POST";
@@ -35,10 +38,11 @@ namespace testdlna {
 			Request.Expect      = "";
 			if (UserAgent.Length > 0)
 				Request.UserAgent = UserAgent;
+			Console.WriteLine("URL: "+ url);
 		}
 
 		public void SetFile(string fileURI, string name, string time, string date) {
-			SetSOAPAction("AVTransport", "SetAVTransportURI");
+			SetSOAPAction("AVTransport", "SetAVTransportURI", 0);
 			string didlMeta = GetDIDLVideoMetadata(fileURI, name, time, date);
 			string xml = "<CurrentURI>" + fileURI + "</CurrentURI>\n        <CurrentURIMetaData>"+ WebUtility.HtmlEncode(didlMeta) + "</CurrentURIMetaData>";
 			SetPayload(soapCommand, xml);
@@ -46,8 +50,14 @@ namespace testdlna {
         }
 
 		public void Play(int speed = 1) {
-			SetSOAPAction("AVTransport", "Play");
-			SetPayload(soapCommand, "<Speed>"+speed+"</Speed>");
+			SetSOAPAction("AVTransport", "Play", 0);
+			SetPayload(soapCommand, "<Speed>" + speed + "</Speed>");
+			Send();
+		}
+
+		public void Stop(int speed = 1) {
+			SetSOAPAction("AVTransport", "Stop", 0);
+			SetPayload(soapCommand);
 			Send();
 		}
 
@@ -111,12 +121,58 @@ namespace testdlna {
 				WebException wex = ex as WebException;
 				if (wex != null) {
 					using (var sr = new StreamReader(wex.Response.GetResponseStream())) {
-						responseText = sr.ReadToEnd().Trim();
+						responseBody = sr.ReadToEnd().Trim();
 						sr.Close();
 					}
 				}
             }
         }
+
+		public void SearchRenderers() {
+			IPEndPoint LocalEndPoint = new IPEndPoint(IPAddress.Any, 61500);
+			IPEndPoint MulticastEndPoint = new IPEndPoint(IPAddress.Parse("239.255.255.250"), 1900);
+
+			Socket UdpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+
+			UdpSocket.SetSocketOption(SocketOptionLevel.Socket, SocketOptionName.ReuseAddress, true);
+			UdpSocket.Bind(LocalEndPoint);
+			UdpSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.AddMembership, new MulticastOption(MulticastEndPoint.Address, IPAddress.Any));
+			UdpSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastTimeToLive, 2);
+			UdpSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.MulticastLoopback, true);
+
+			Console.WriteLine("UDP-Socket setup done...\r\n");
+
+			string SearchString = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:ssdp:all\r\nMX:3\r\n\r\n";
+
+			UdpSocket.SendTo(Encoding.UTF8.GetBytes(SearchString), SocketFlags.None, MulticastEndPoint);
+
+			Console.WriteLine("M-Search sent...\r\n");
+
+			byte[] ReceiveBuffer = new byte[64000];
+
+			int ReceivedBytes = 0;
+
+			string msg = "";
+			while (true) {
+				if (UdpSocket.Available > 0) {
+					ReceivedBytes = UdpSocket.Receive(ReceiveBuffer, SocketFlags.None);
+
+					if (ReceivedBytes > 0) {
+						msg = Encoding.UTF8.GetString(ReceiveBuffer, 0, ReceivedBytes);
+						Console.WriteLine(msg);
+						break;
+					}
+				}
+			}
+            string ip="", port = "";
+			Match m = Regex.Match(msg, @"LOCATION:.*?http://(.*?):(.*?)/");
+			if (m.Success) {
+				ip   = m.Groups[1].Value;
+				port = m.Groups[2].Value;
+				deviceAddr = "http://" + ip + ":" + port;
+			}
+			Console.WriteLine("Адрес устройства воспроизведения (Renderer): " + deviceAddr);
+		}
 
 		private static IDictionary<string, string> VideoMIMEmappings = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase) {
 
