@@ -85,9 +85,8 @@ namespace testdlna {
 		/// <param name="defaultValue">Значение по-умолчанию, которое будет возвращено, если ключ не указан в параметрах</param>
 		/// <returns>Возвращает значение указанного ключа или значение defaultValue, если указанный параметр не присутствует в параметрах запуска программы</returns>
 		static string GetKey(string[] args, string key, string defaultValue) {
-			foreach (string arg in args) {
-				Match m = Regex.Match(arg, key + "\\s*?\"(?<val>.*?)\"");
-				if (m.Success) return m.Groups["val"].Value;
+			for (int i = 0; i < args.Length; i++) {
+				if (Regex.IsMatch(args[i], key) && (args.Length >= i+1)) return args[i + 1];
 			}
 			return defaultValue;
 		}
