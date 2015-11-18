@@ -17,15 +17,16 @@ namespace testdlna {
 
 		private HttpWebRequest Request        = null;
 
-		private string RequestPayload = "";
-		private string SoapCommand    = "";
-		private string SoapService    = "";
-		private string NameSpace      = "";
+		private string RequestPayload  = "";
+		private string SoapCommand     = "";
+		private string SoapService     = "";
+		private string NameSpace       = "";
 
-        public string ResponseText = "";
-		public string ResponseBody = "";
-		public string UserAgent    = "";
-		public string MIMEtype     = "";
+		public string ErrorCode        = "";
+		public string ErrorDescription = "";
+		public string ResponseText     = "";
+		public string UserAgent        = "";
+		public string MIMEtype         = "";
 
 		public bool Debug = false;
 
@@ -88,7 +89,6 @@ namespace testdlna {
 
 		private string GetResponse(string url = "") {
 			ResponseText = "";
-			ResponseBody = "";
 			WebResponse  response      = null;
 			StreamReader readStream    = null;
 			Stream       receiveStream = null;
@@ -97,7 +97,7 @@ namespace testdlna {
 				response      = Request.GetResponse();
 				receiveStream = response.GetResponseStream();
 				readStream    = new StreamReader(receiveStream, Encoding.UTF8);
-				ResponseBody  = readStream.ReadToEnd();
+				ResponseText  = readStream.ReadToEnd();
 
 			} catch (WebException e) {
 				Console.WriteLine("Ошибка: " + e.Message + " Статус: " + e.Status.ToString());
@@ -113,16 +113,21 @@ namespace testdlna {
 				if (receiveStream != null) receiveStream.Close();
 				if (response      != null) response     .Close();
 			}
+			ErrorCode        = Regex.Match(ResponseText, "<errorCode>(.*?)</errorCode>"              , RegexOptions.IgnoreCase).Groups[1].Value;
+			ErrorDescription = Regex.Match(ResponseText, "<errorDescription>(.*?)</errorDescription>", RegexOptions.IgnoreCase).Groups[1].Value;
 			if (Debug) {
 				StringBuilder sb = new StringBuilder();
 				sb.AppendLine("Current SOAP action: " + SoapService + "#" + SoapCommand);
-				sb.AppendLine("Request url: " + Request.RequestUri.AbsoluteUri);
+				sb.AppendLine("Request url: "     + Request.RequestUri.AbsoluteUri);
 				sb.AppendLine("Request payload: " + RequestPayload);
-				sb.AppendLine("ResponseText: " + ResponseText);
-				sb.AppendLine("ResponseBody: " + ResponseBody);
+				sb.AppendLine("ResponseText: "    + ResponseText);
 				LogMe(sb.ToString());
 			}
-			return ResponseBody;
+			if (ErrorCode.Length > 0) {
+				Console.WriteLine("Код ошибки: " + ErrorCode + " (" + GetErrorDescriptionByCode() + ")");
+				Console.WriteLine("Описание ошибки: " + ErrorDescription);
+			}
+			return ResponseText;
 		}
 
 		public void SearchRenderers(bool output2console = false) {
@@ -142,12 +147,12 @@ namespace testdlna {
 
 				udpSocket.Bind(localEndPoint);
 
-				string SearchString = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:upnp:rootdevice\r\nMX:3\r\nUSER-AGENT: unix/5.1 UPnP/1.0 testdlna/1.0\r\n\r\n";
+				string SearchString = "M-SEARCH * HTTP/1.1\r\nHOST:239.255.255.250:1900\r\nMAN:\"ssdp:discover\"\r\nST:upnp:rootdevice\r\nMX:4\r\nUSER-AGENT: UDAP/2.0 UPnP/1.1 testdlna/1.0\r\n\r\n";
 
 				udpSocket.SendTo(Encoding.UTF8.GetBytes(SearchString), SocketFlags.None, multicastEndPoint);
 
 				if (output2console) Console.WriteLine("M-Search sent...\r\n");
-				System.Threading.Thread.Sleep(3000);
+				System.Threading.Thread.Sleep(4000);
 
 				byte[] ReceiveBuffer = new byte[64000];
 				int ReceivedBytes = 0;
@@ -207,7 +212,7 @@ namespace testdlna {
 		}
 
 		private string GetAnswerValue(string answer, string name) {
-			return Regex.Match(answer, name+":(.*?)[\r\n]").Groups[1].Value.Trim();
+			return Regex.Match(answer, name+":(.*?)[\r\n]", RegexOptions.IgnoreCase).Groups[1].Value.Trim();
         }
 
 		private string GetXmlValue(string xml, string name) {
@@ -231,6 +236,7 @@ namespace testdlna {
 
 		private string GetDIDLVideoMetadata(string fileUri, string title, string time, string date, int size = 0, string itemId = "advert", string parentId = "0", int restricted = 1) {
 			string mime = (MIMEtype.Length > 0) ? MIMEtype : GetMIMEfromExt(Path.GetExtension(fileUri));
+			Console.WriteLine("Установлен MIME-тип файла: " + mime);
 			StringBuilder sb = new StringBuilder();
 			sb.AppendLine("<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\">");
 			sb.AppendLine("<item id=\"" + itemId + "\" parentID=\"" + parentId + "\" restricted=\"" + restricted + "\">");
@@ -248,6 +254,33 @@ namespace testdlna {
 			string mime;
 			return VideoMIMEmappings.TryGetValue(extension, out mime) ? mime : "video/mp4";
 		}
+
+		private string GetErrorDescriptionByCode() {
+			string desc;
+			return ErrorCodeDescriptions.TryGetValue(ErrorCode, out desc) ? desc : "";
+		}
+
+		private static IDictionary<string, string> ErrorCodeDescriptions = new Dictionary<string, string>() {
+			{"401", "Invalid Action"},
+			{"402", "Invalid args"},
+			{"404", "Invalid Var"},
+			{"501", "Action failed"},
+			{"701", "No such object"},
+			{"702", "Invalid CurrentTagValue"},
+			{"703", "Invalid NewTagValue"},
+			{"704", "Required tag"},
+			{"705", "Read only tag"},
+			{"706", "Parameter Mismatch"},
+			{"708", "Unsupported or invalid search criteria"},
+			{"709", "Unsupported or invalid sort criteria"},
+			{"710", "No such container"},
+			{"711", "Restricted object"},
+			{"712", "Bad metadata"},
+			{"713", "Restricted parent object"},
+			{"714", "No such source resource"},
+			{"715", "Source resource access denied"},
+			{"716", "Transfer busy"}
+		};
 
 		private static IDictionary<string, string> VideoMIMEmappings = new Dictionary<string, string>(StringComparer.InvariantCultureIgnoreCase) {
 			#region Big freaking list of mime types
