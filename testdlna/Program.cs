@@ -10,6 +10,7 @@ namespace testdlna {
 		static void Main(string[] args) {
     
 			bool   debug      = false;                 // флаг отладки (ведения лог-файла)
+			string MIMEtype   = "";                    // Если установлено - MIME-тип, который будет принудительно (без автоопределения) передан
 			string userAgent  = "SEC_HHP_Flipps/1.0";  // User-Agent для запросов устройству
 			string deviceIP   = "192.168.2.3";         // IP адрес устройства, которому будет отправлен файл (вместо IP может быть любое ключевое слово, по которому можно будет идентифицировать устройство)
 			string fileURI    = "http://5.9.84.176:8080/app/2LES5e/sd0lGeslRbp8GCXTHsdpEE3jfNaogpnMB68c8bzqbIWRwR3xz8TPVxIx76W+7ijJPgNdKSL0fadYXoPyIdgXco9FWmwFnqVm703hEhet23JILKNo/A1xDVyAAgzwZnyBXqmqwRpbnG3gKK1+hU+ix5j9L5/yvOlSREqLIZ9baL3ozyliyKif0IL53g8wUKmr2RVJx+mimjtXgVttg/oa3myKT4nW4OvvL2n8vKJQxZvcQf3U57o722gGswA8XkcgEKOVjKS0zOC6eAG/+68YWeXegcgtwgeVkcNKMV6B9iO60x+A1lldRH+PwNLBCdahHBKyeJM0ZEIkLsUg3F9eGwYW9EN44GpgV6Wmb0+cn1wnljVtNhPpxDWQQMZ2+H2vpTBD/uChg/Vea8GpRkO+IA4EdLruyYgSAS6LS4q0R2ZrzKxVOszbtHucM.mp4";
@@ -20,6 +21,7 @@ namespace testdlna {
 			if (args.Length > 0) deviceIP   = args[0]; // Первый параметр, елси указан - IP устройства, которому будет отправлен файл
 			if (args.Length > 1) {                     // Если указаны другие параметры, проверяем их
 				fileURI   = GetKey(args, "-(f|file)"     , fileURI  ); // Отправляемый файл на телек
+				MIMEtype  = GetKey(args, "-(m|mime)"     , MIMEtype ); // MIME-тип передаваемого файла
 				userAgent = GetKey(args, "-(a|useragent)", userAgent); // User-Agent, который будет использован для общения с устройством
 				debug     = ChkKey(args, "-d");        // Режим отладки - запись ответов от устройства в лог-файл
 			}

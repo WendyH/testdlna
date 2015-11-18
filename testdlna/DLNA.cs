@@ -25,6 +25,7 @@ namespace testdlna {
         public string ResponseText = "";
 		public string ResponseBody = "";
 		public string UserAgent    = "";
+		public string MIMEtype     = "";
 
 		public bool Debug = false;
 
@@ -202,7 +203,7 @@ namespace testdlna {
 
 		public bool SelectDevice(string key) {
 			SelectedDevice = Devices.Select(key);
-			return (SelectedDevice!=null);
+			return (SelectedDevice.Name.Length > 0);
 		}
 
 		private string GetAnswerValue(string answer, string name) {
@@ -229,7 +230,7 @@ namespace testdlna {
 		}
 
 		private string GetDIDLVideoMetadata(string fileUri, string title, string time, string date, int size = 0, string itemId = "advert", string parentId = "0", int restricted = 1) {
-			string mime = GetMIMEfromExt(Path.GetExtension(fileUri));
+			string mime = (MIMEtype.Length > 0) ? MIMEtype : GetMIMEfromExt(Path.GetExtension(fileUri));
 			StringBuilder sb = new StringBuilder();
 			sb.AppendLine("<DIDL-Lite xmlns=\"urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:upnp=\"urn:schemas-upnp-org:metadata-1-0/upnp/\" xmlns:dlna=\"urn:schemas-dlna-org:metadata-1-0/\">");
 			sb.AppendLine("<item id=\"" + itemId + "\" parentID=\"" + parentId + "\" restricted=\"" + restricted + "\">");
@@ -336,11 +337,6 @@ namespace testdlna {
 			{".wav" , "audio/x-wav"},
 			{".wax" , "audio/x-ms-wax"},
 			{".wma" , "audio/x-ms-wma"},
-			{".aiff" , "audio/aiff"},
-			{".aiff" , "audio/aiff"},
-			{".aiff" , "audio/aiff"},
-			{".aiff" , "audio/aiff"},
-			{".aiff" , "audio/aiff"},
 
 			{ ".bmp" , "image/bmp"},
 			{ ".bw" , "image/bw"},
@@ -381,15 +377,7 @@ namespace testdlna {
 			{ ".tga" , "image/tga"},
 			{ ".tif" , "image/tiff"},
 			{ ".tiff" , "image/tiff"},
-			{ ".wdp" , "image/vnd.ms-photo"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"},
-			{ ".bmp" , "image/bmp"}
+			{ ".wdp" , "image/vnd.ms-photo"}
 			#endregion
         };
 
